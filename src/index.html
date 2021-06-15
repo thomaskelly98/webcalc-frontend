@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>WebCalc</title>
+<!-- Define config in head -->
+<script type="text/javascript" src="config.js"></script>
+
+<script type="text/javascript">
+
+let value = 0;
+let x = 0;
+let y = 0;
+let operation = '';
+// part B
+let executing = false;
+let firstNumber = false;
+// part E
+let identifiers = [["Timestamp", "ID", "Value"]];
+window.onload = function() {
+    displayIdentifiers();
+}
+
+// Load config file
+var head= document.getElementsByTagName('head')[0];
+var script= document.createElement('script');
+script.type= 'text/javascript';
+script.src= 'config.js';
+head.appendChild(script);
+
+// URLs
+var allURLs = config.urls;
+var databaseURL = config.database_url;
+
+var buttons = document.getElementsByClassName("calc1");
+// ensure buttons are enabled
+enableButtons()
+
+
+function chooseEndpoint()
+{
+    let random = Math.floor(Math.random() * allURLs.length);
+    // Use to print proxy being used
+    console.log(allURLs[random]);
+    // return random URL
+    return allURLs[random];
+}
+
+function blockButtons()
+{
+    for (i = 0; i < buttons.length; i++) {
+        buttons[i].disabled = true;
+    }
+}
+
+function enableButtons()
+{
+    for (i = 0; i < buttons.length; i++) {
+        buttons[i].disabled = false;
+    }
+}
+
+
+function generateIdentifier() 
+{
+    identifier = Math.random().toString(36).substr(2, 5);
+    return identifier;
+}
+
+function displayIdentifiers() 
+{
+    var idTable = document.getElementById("id_table");
+    var nHTML = '';
+    for (var i = 0; i < identifiers.length; i++) {
+    for(var j=0; j<identifiers[i].length; j++){
+        nHTML+= identifiers[i][j]+ ' ';
+    }
+    nHTML = '<div>' + nHTML + '</div>';
+    }
+    idTable.innerHTML = nHTML;
+}
+
+// let i_test = 0;
+function saveCurrentValue()
+{
+    let current_value = value;
+    identifier = generateIdentifier();
+    time = getCurrentTime();
+
+    // TO TEST IMPLEMENTATION
+    // if (i_test < 10) {
+    //     identifier = "3aps9";
+    //     i_test+=1;
+    // }
+
+    // make web request to save current value
+    let xhttp = new XMLHttpRequest();
+    xhttp.onload = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var j = JSON.parse(this.response);
+
+            // catch error
+            if (j.error != false) {
+                if (j.string == "Unique ID already exists") {
+                    console.log("Unique ID already exists. Retrying")
+                    saveCurrentValue();
+                    return;
+                }
+                else {
+                    alert("Error: " + j.string);
+                    return;
+                }
+            }
+
+            // if no issues. add id to array and display id
+            identifiers.push([time, identifier, current_value]);
+            displayIdentifiers();
+        }
+    };
+    xhttp.onerror = function () {
+        console.error("Unable to connect to server");
+    };
+
+    xhttp.open("GET", databaseURL+"/?time="+time+"&unique_id="+identifier+"&value="+current_value);
+    xhttp.send();
+}
+
+function getCurrentTime() 
+{
+    var time = new Date().toLocaleTimeString();
+    return time;
+}
+
+function retrieveValue() 
+{
+    id = document.getElementById('unique_id').value;
+
+    if (id == '') {
+        console.log('Unique ID field cannot be empty');
+        alert('Unique ID field cannot be empty');
+        return;
+    }
+
+    // make web request to get value
+    let xhttp = new XMLHttpRequest();
+    xhttp.onload = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var j = JSON.parse(this.response);
+            x=0;
+            y=0;
+            operation='';
+
+            // catch error
+            if (j.error != false) {
+                alert("Error: " + j.string);
+                return;
+            }
+
+            value = j.value;
+            Display();
+        }
+    };
+    xhttp.onerror = function () {
+        console.error("Unable to connect to server");
+    };
+
+    xhttp.open("GET", databaseURL+"/get_value?unique_id="+id);
+    xhttp.send();
+
+    document.getElementById('unique_id').value = '';
+    return;
+}
+
+function Display()
+{
+    document.getElementById('display').value = value;
+}
+
+function Clear()
+{
+    value = 0;
+    x = 0;
+    y = 0;
+    operation = '';
+    Display();
+    firstNumber = true;
+}
+
+function NumClick(n)
+{
+    if (value == 0)
+        value = n;
+    else if (operation != '' || firstNumber == true) {
+        value *= 10;
+        value += n;
+    }
+
+    Display();
+}
+
+function Plus()
+{
+    // if we have an outstanding operation resolve it
+    if (operation != '')
+        Equals();
+
+    x = value;
+    value = 0;
+    operation = '+';
+
+    Display();
+}
+
+function Minus()
+{
+    // if we have an outstanding operation resolve it
+    if (operation != '')
+        Equals();
+
+    x = value;
+    value = 0;
+    operation = '-';
+
+    Display();
+}
+
+function Multiply()
+{
+    // if we have an outstanding operation resolve it
+    if (operation != '')
+        Equals();
+
+    x = value;
+    value = 0;
+    operation = '*';
+
+    Display();
+}
+
+function Divide()
+{
+    // if we have an outstanding operation resolve it
+    if (operation != '')
+        Equals();
+
+    x = value;
+    value = 0;
+    operation = '/';
+
+    Display();
+}
+
+function Square()
+{
+    // if we have an outstanding operation resolve it
+    if (operation != '')
+        Equals();
+
+    x = value;
+    value = 0;
+    operation = '^2';
+
+    Display();
+}
+
+function Modulo()
+{
+    // if we have an outstanding operation resolve it
+    if (operation != '')
+        Equals();
+
+    x = value;
+    value = 0;
+    operation = '%';
+
+    Display();
+}
+
+function Equals()
+{
+    if (operation == '')
+        return;
+
+    if (executing == true)
+        return;
+
+    y = value;
+
+    executing = true;
+
+    blockButtons();
+
+    firstNumber = false;
+
+    if (operation == '+')
+    {
+        let xhttp = new XMLHttpRequest();
+        xhttp.onload = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                var j = JSON.parse(this.response);
+                x=0;
+                y=0;
+                operation='';
+
+                // catch error
+                if (j.error != false) {
+                    alert("Error: " + j.string);
+                    executing = false;
+                    enableButtons();
+                    return;
+                }
+
+                value = j.answer;
+                executing = false;
+                enableButtons();
+                Display();
+                saveCurrentValue();
+            }
+        };
+        xhttp.onerror = function () {
+            console.error("Unable to connect to server");
+            console.log("Trying a different server");
+            executing = false;
+            Equals();
+        };
+
+        url = chooseEndpoint();
+        xhttp.open("GET", url+"?x="+x+"&y="+y+"&operation="+operation, true);
+        xhttp.send();
+
+        return;
+    }
+    else if (operation == '-')
+    {
+        let xhttp = new XMLHttpRequest();
+        xhttp.onload = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                var j = JSON.parse(this.response);
+                x=0;
+                y=0;
+                operation='';
+
+                // catch error
+                if (j.error != false) {
+                    alert("Error: " + j.string);
+                    executing = false;
+                    enableButtons();
+                    return;
+                }
+
+                value = j.answer;
+                executing = false;
+                enableButtons();
+                Display();
+                saveCurrentValue();
+            }
+        };
+        xhttp.onerror = function () {
+            console.error("Unable to connect to server");
+            console.log("Trying a different server");
+            executing = false;
+            Equals();
+        };
+
+        url = chooseEndpoint();
+        xhttp.open("GET", url+"?x="+x+"&y="+y+"&operation="+operation);
+        xhttp.send();
+
+        return;
+    }
+    else if (operation == '*')
+    {
+        let xhttp = new XMLHttpRequest();
+        xhttp.onload = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                var j = JSON.parse(this.response);
+                x=0;
+                y=0;
+                operation='';
+
+                // catch error
+                if (j.error != false) {
+                    alert("Error: " + j.string);
+                    executing = false;
+                    enableButtons();
+                    return;
+                }
+
+                value = j.answer;
+                executing = false;
+                enableButtons();
+                Display();
+                saveCurrentValue();
+            }
+        };
+        xhttp.onerror = function () {
+            console.error("Unable to connect to server");
+            console.log("Trying a different server");
+            executing = false;
+            Equals();
+        };
+
+        url = chooseEndpoint();
+        xhttp.open("GET", url+"?x="+x+"&y="+y+"&operation="+operation);
+        xhttp.send();
+
+        return;
+    }
+    else if (operation == '/')
+    {
+        let xhttp = new XMLHttpRequest();
+        xhttp.onload = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                var j = JSON.parse(this.response);
+                x=0;
+                y=0;
+                operation='';
+
+                // catch error
+                if (j.error != 0) {
+                    alert("Error: " + j.error);
+                    executing = false;
+                    enableButtons();
+                    return;
+                }
+
+                value = j.answer;
+                executing = false;
+                enableButtons();
+                Display();
+                saveCurrentValue();
+            }
+        };
+        xhttp.onerror = function () {
+            console.error("Unable to connect to server");
+            console.log("Trying a different server");
+            executing = false;
+            Equals();
+        };
+
+        url = chooseEndpoint();
+        xhttp.open("GET", url+"?x="+x+"&y="+y+"&operation="+operation);
+        xhttp.send();
+
+        return;
+    }
+    else if (operation == '^2')
+    {
+        let xhttp = new XMLHttpRequest();
+        xhttp.onload = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                var j = JSON.parse(this.response);
+                x=0;
+                y=0;
+                operation='';
+
+                // catch error
+                if (j.error != "") {
+                    alert("Error: " + j.error);
+                    executing = false;
+                    enableButtons();
+                    return;
+                }
+
+                value = j.answer;
+                executing = false;
+                enableButtons();
+                Display();
+                saveCurrentValue();
+            }
+        };
+        xhttp.onerror = function () {
+            console.error("Unable to connect to server");
+            console.log("Trying a different server");
+            executing = false;
+            Equals();
+        };
+
+        url = chooseEndpoint();
+        xhttp.open("GET", url+"?x="+x+"&y="+y+"&operation="+operation);
+        xhttp.send();
+
+        return;
+    }
+    else if (operation == '%')
+    {
+        let xhttp = new XMLHttpRequest();
+        xhttp.onload = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                var j = JSON.parse(this.response);
+                x=0;
+                y=0;
+                operation='';
+
+                // catch error
+                if (j.error != "") {
+                    alert("Error: " + j.error);
+                    executing = false;
+                    enableButtons();
+                    return;
+                }
+
+                value = j.answer;
+                executing = false;
+                enableButtons();
+                Display();
+                saveCurrentValue();
+            }
+        };
+        xhttp.onerror = function () {
+            console.error("Unable to connect to server");
+            console.log("Trying a different server");
+            executing = false;
+            Equals();
+        };
+
+        url = chooseEndpoint();
+        xhttp.open("GET", url+"?x="+x+"&y="+y+"&operation="+operation);
+        xhttp.send();
+
+        return;
+    }
+}
+
+</script>
+
+<style type="text/css">
+body  {
+    font-size: 150%;
+    font-family: monospace;
+}
+
+#logo
+{
+    font-family: Calibri, sans-serif;
+    font-weight: lighter;
+    color: #505050;
+    margin: 0.5em;
+}
+
+#calculator
+{
+    text-align: center;
+    margin-top: 1em;
+}
+
+#display {
+    font-size: 100%;
+    padding: 0.2em;
+    margin: 0.2em;
+    font-family: monospace;
+    letter-spacing: 0.1em;
+}
+
+#id_table {
+  top: 10px;
+  right: 10px;
+  left: 10px;
+}
+
+.calc1 {
+    border: solid #d0d0d0 1px;
+    background-color: #f0f0f0;
+    padding: 1.5em;
+    margin: 1em;
+}
+</style>
+
+</head>
+<body>
+<div id="calculator">
+    <div id="logo">
+        Casidave Calcutron
+    </div>
+    <div>
+        <input type="text" id="display" readonly="1" value="">
+    </div>
+    <div>
+        <button class="calc1" onclick="Clear();">C</button>
+        <button class="calc1" onclick="Multiply();">x</button>
+        <button class="calc1" onclick="Divide();">/</button>
+        <button class="calc1" onclick="NumClick('');">''</button>
+    </div>
+    <div>
+        <button class="calc1" onclick="NumClick(7);">7</button>
+        <button class="calc1" onclick="NumClick(8);">8</button>
+        <button class="calc1" onclick="NumClick(9);">9</button>
+        <button class="calc1" onclick="Plus();">+</button>
+    </div>
+    <div>
+        <button class="calc1" onclick="NumClick(4);">4</button>
+        <button class="calc1" onclick="NumClick(5);">5</button>
+        <button class="calc1" onclick="NumClick(6);">6</button>
+        <button class="calc1" onclick="Minus();">-</button>
+    </div>
+    <div>
+        <button class="calc1" onclick="NumClick(1);">1</button>
+        <button class="calc1" onclick="NumClick(2);">2</button>
+        <button class="calc1" onclick="NumClick(3);">3</button>
+        <button class="calc1" onclick="Equals();">=</button>
+    </div>
+    <div>
+        <button class="calc1" onclick="NumClick(0);">0</button>
+        <button class="calc1" onclick="NumClick('t');">t</button>
+        <button class="calc1" onclick="Square();">^2</button>
+        <button class="calc1" onclick="Modulo();">%</button>
+    </div>
+    <div>
+        <p><b>Recall Previous Value</b></p>
+        <p>To retrieve a previous value, input its unique ID below.</p>
+    </div>
+    <div style="display:flex; flex-direction: row; justify-content: center; align-items: center">
+        <p>Unique ID: </p>
+        <input type="text" id="unique_id">
+        <button onclick="retrieveValue();">Submit</button>
+    </div>
+    <div id="id_table"></div>
+</div>
+</body>
+
+<script type="text/javascript">
+    value = 1234;
+    Display();
+</script>
+
+</html>
